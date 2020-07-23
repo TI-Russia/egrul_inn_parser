@@ -6,7 +6,6 @@ import time
 from selenium.webdriver.chrome.options import Options
 import random
 from tqdm import tqdm
-from datetime import datetime
 import argparse
 
 
@@ -33,10 +32,10 @@ help = """
 argparser = argparse.ArgumentParser()
 argparser.add_argument('--data_path', type=str)
 argparser.add_argument('--driver', type=str)
-argparser.add_argument('--pdf_path', type=str, default="./")
+argparser.add_argument('--pdf_path', type=str, default="./dwnldpdf")
 args = argparser.parse_args()
 
-dwdirname = os.path.join(args.pdf_path, datetime.strftime(datetime.today(), "download_%d_%m_%Y"))
+dwdirname = args.pdf_path
 
 if not os.path.exists(dwdirname):
     os.mkdir(dwdirname)
