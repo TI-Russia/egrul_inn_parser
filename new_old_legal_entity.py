@@ -69,4 +69,4 @@ KKK = '|'.join(df_forms['Полное наименование РП'].values)
 df["clean_position"] = df.position.apply(get_relivant)
 df_fin = df[~df.clean_position.isna()]
 
-df_fin.to_csv("new_old_legal_entity_id.csv", index=False)
+df_fin.to_csv("new_old_legal_entity.csv", index=False)
