@@ -18,22 +18,12 @@ def t_o():
     time.sleep(random.uniform(12.5,17.5))
 
 
-help = """
-Парсер ЕГРЮЛ.
+argparser = argparse.ArgumentParser(description='Парсер ЕГРЮЛ')
+argparser.add_argument('--pdf_path', type=str, default="./dwnldpdf", help="путь для сохранения pdf-выписок", required=False)
+requiredNamed = argparser.add_argument_group('required arguments')
+requiredNamed.add_argument('--data_path', type=str, help="таблица с данными о legalentity (название для поиска, id в базе)", required=True)
+requiredNamed.add_argument('--driver', type=str, help="путь к chromedriver", required=True)
 
-Обязательные аргументы:
---data_path — таблица с данными о legalentity
---driver — путь к chromedriver
-
-Опционально:
---pdf_path — путь для сохранения pdf-выписок
-"""
-
-
-argparser = argparse.ArgumentParser()
-argparser.add_argument('--data_path', type=str)
-argparser.add_argument('--driver', type=str)
-argparser.add_argument('--pdf_path', type=str, default="./dwnldpdf")
 args = argparser.parse_args()
 
 dwdirname = args.pdf_path
