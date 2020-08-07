@@ -43,7 +43,7 @@ driver = Chrome(executable_path=args.driver, options=chromeOptions)
 driver.get("https://egrul.nalog.ru/index.html")
 DATA = os.listdir(absdwdirname)
 
-dfcl = df.drop_duplicates("clean_position")
+dfcl = df.drop_duplicates("name")
 
 doneid = [re.sub("\.\w+$", "", name) for name in DATA]
 dfcl = dfcl[~dfcl.id.isin(doneid)]
@@ -52,7 +52,7 @@ dfcl = dfcl[~dfcl.id.isin(doneid)]
 with tqdm(total=dfcl.shape[0]) as pbar:
     for i, r in dfcl.iterrows():
         
-        name = r["clean_position"]
+        name = r["name"]
         did = r["id"]
         
         search = driver.find_element_by_id('query')
