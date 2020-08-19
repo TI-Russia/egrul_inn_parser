@@ -1,9 +1,32 @@
 from tabula import read_pdf
 import pandas as pd
+import re
+import json
+from collections import Counter
+
+
+class InfIter:
+    def __iter__(self):
+        self.num = 1
+        return self
+
+    def __next__(self):
+        num = self.num
+        self.num += 1
+        return num
 
 
 def get_n_key(l, n, p):
-    return f"{l.lower().strip()}.{n.lower().strip()[0]}.{p.lower().strip()[0]}"
+
+    N = ""
+    if n:
+        N = f"{n[0]}."
+
+    P = ""
+    if p:
+        P = f"{p[0]}."
+
+    return f"{N}{P}{l}"
 
 
 def getse(df, a, b):
@@ -16,6 +39,63 @@ def getse(df, a, b):
     return a, b
 
 
+n = iter(InfIter())
+
+
+def get_pers_inf(DF):
+
+    persons = []
+
+    head_data_str = "Сведения о лице, имеющем право без доверенности действовать от имени юридического лица" 
+    person_date_str = "ГРН и дата внесения в ЕГРЮЛ сведений о данном лице"
+    position_str = "Должность"
+    grbg = ["ГРН и дата внесения в ЕГРЮЛ записи, содержащей указанные сведения"]
+
+    if head_data_str in DF[0].values:
+        a = DF.set_index(0).loc[head_data_str, "f"]
+        pers_info = DF.set_index("f")[a:a+1].set_index(1, drop=False).dropna()
+        Counter(pers_info.index)
+        d = Counter(pers_info.index)
+        
+        if d.get(person_date_str, None) == d.get(position_str, None):
+            if d[position_str] == 1:
+                det_a = pers_info.loc[person_date_str, 0]
+                det_b = pers_info.loc[position_str, 0]
+                boundaries = [(det_a, det_b)]
+            else:
+                det_a = pers_info.loc[person_date_str, 0].values
+                det_b = pers_info.loc[position_str, 0].values
+                boundaries = list(zip(det_a, det_b))
+            for pers_det in boundaries:
+                start, end = pers_det
+                actual_one = pers_info.set_index(0)[start:end].set_index(1)[2].str.lower()
+                actual_one_clean = actual_one.loc[~actual_one.index.isin(grbg)].to_json(force_ascii=False)
+                person_json = json.loads(actual_one_clean)
+                
+                # person_json["grn"] = re.search(r"\d{3,}", person_json[person_date_str]).group()
+                person_json["date"] = re.search(r"\d\d\.\d\d\.\d{4}", person_json[person_date_str]).group()
+
+                pj = {
+
+                "lastname" : person_json.get("Фамилия", "").strip(),
+                "firstname" : person_json.get("Имя", "").strip(),
+                "patronymic" : person_json.get("Отчество", "").strip(),
+                "inn" : person_json.get("ИНН", ""),
+                "date" : person_json["date"]
+
+                }
+                
+                
+                persons.append(pj)
+
+    return persons
+
+
+def flag(x):
+
+    if re.search(r"^[А-ЯЁа-яё\s\(\),]+$", str(x)):
+        return next(n)
+
 def get_info(pdfpath, k):
 
     df = read_pdf(
@@ -23,82 +103,30 @@ def get_info(pdfpath, k):
         # encoding='windows-1251',
         encoding='utf-8',
         lattice=True,
-        pandas_options={'header': None},
+        pandas_options={'header' : None, 'dtype' : str},
         pages='all',
         multiple_tables=True
     )
 
-    ogrn = "".join(df[0].values[0].astype(str))
-
     DF = df[1].append([df[2], df[3]])
     DF.reset_index(drop=True, inplace=True)
-    DF = DF.replace({r'\r|\n': ' '}, regex=True).set_index(0)
+    DF = DF.replace({r'\r|\n': ' '}, regex=True)#.set_index(0)
 
-    a = "Сведения о лице, имеющем право без доверенности действовать от имени юридического лица"
+    DF["f"] = DF[0].apply(flag)
 
-    b = "Сведения об учредителях (участниках) юридического лица"
-    b2 = "Сведения об основном виде деятельности"
-    b3 = "Сведения о записях, внесенных в Единый государственный реестр юридических лиц"
+    m = DF.set_index(0).loc["Наименование", "f"]
+    rg = DF.set_index(0).loc["Сведения об учете в налоговом органе", "f"]
+    main_info = DF.set_index("f")[m:rg+1].set_index(1, drop=True).dropna()
 
-    if not b in DF.index:
-        if b2 in DF.index:
-            b = b2
-        else:
-            b = b3
-
-    c = "Наименование"
-    d = "Сведения о регистрации в качестве страхователя в территориальном органе Пенсионного фонда Российской Федерации"
-    
-    DF.fillna("", inplace=True)
-    main_info = DF[c:d].set_index(1)
-
-    pers_info = DF[a:b].set_index(1)
+    main_info_j = main_info.loc[main_info.index.drop_duplicates(keep=False)][2].to_json(force_ascii=False)
+    main_info_j = json.loads(main_info_j)
     
     info = {
         "id":k,
-        "ogrn" : ogrn,
-        "inn"  : main_info.loc["ИНН", 2],
-        "full_name_egrul" : main_info.loc["Полное наименование", 2],
-        "pers" : []
+        "ogrn" : main_info_j.get("ИНН", ""),
+        "inn"  : main_info_j.get("ОГРН", ""),
+        "full_name_egrul" : main_info_j.get("Полное наименование", ""),
+        "pers" : get_pers_inf(DF)
     }
-    
-    hms = ["Фамилия", "Имя", "Отчество", "ИНН", "ГРН и дата внесения в ЕГРЮЛ сведений о данном лице"]
-    for hm in hms:
-        if not hm in pers_info.index or len(pers_info.loc[hm]) != len(pers_info.loc["ИНН"]):
-            print(pers_info)
-            return info
-
-    ppp = pers_info.loc[hms].drop_duplicates()
-
-    lns = ppp.loc["Фамилия", 2]
-    fns = ppp.loc["Имя", 2]
-    pcs = ppp.loc["Отчество", 2]
-    pinns = ppp.loc["ИНН", 2]
-    grn_date = ppp.loc["ГРН и дата внесения в ЕГРЮЛ сведений о данном лице", 2]
-    
-    if ppp.shape[0]>5:
-        prsns = list(zip(lns, fns, pcs, pinns, grn_date))
-        
-        info["pers"] = [
-            {
-                "lastname" : p[0].lower(),
-                "firstname" : p[1].lower(),
-                "patronymic" : p[2].lower(),
-                "inn" : p[3].lower(),
-                "grn" : re.search(r"\d{3,}", p[4]).group(),
-                "date" : re.search(r"\d\d\.\d\d\.\d{4}", p[4]).group()
-            } for p in prsns]
-
-    else:
-        
-        info["pers"] = [
-            {"lastname" : lns.lower(),
-             "firstname" : fns.lower(),
-             "patronymic" : pcs.lower(),
-             "inn" : pinns.lower(),
-             "grn" : re.search(r"\d{3,}", grn_date).group(),
-             "date" : re.search(r"\d\d\.\d\d\.\d{4}", grn_date).group()
-            }
-        ]
 
     return info
