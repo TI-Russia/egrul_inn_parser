@@ -3,6 +3,8 @@ import os
 import re
 from tqdm import tqdm
 from pdfcom import get_n_key, getse, get_info
+import argparse
+import json
 
 
 argparser = argparse.ArgumentParser(description='Парсер ЕГРЮЛ')
@@ -14,6 +16,7 @@ args = argparser.parse_args()
 pdf_path = args.pdf_path
 
 h = []
+Err = {}
 
 pdfs = os.listdir(pdf_path)
 
@@ -24,15 +27,19 @@ with tqdm(total=len(pdfs)) as pbar:
         
         try:
             h.append(get_info(os.path.join(pdf_path, pdf_name), pdf_id))
-            pbar.update()
+            
         except Exception as E:
             print(E, pdf_id, sep="\n")
+            Err[pdf_id] = str(E)
+
+        pbar.update()
                  
 inn_pers = []
 
 for inf in h:
     if inf["pers"]:
         for p in inf["pers"]:
+
             r = (
                 inf["id"], 
                 get_n_key(
@@ -49,11 +56,14 @@ for inf in h:
             
 df_inn = pd.DataFrame(inn_pers, columns=[
     "legal_entity_id", 
-    "name_key", 
+    "name_key",
     "name_egrul", 
     "patronymic_egrul", 
     "inn",
     "date"])
+
+with open("err.json", "w") as f:
+    json.dump(Err, f, ensure_ascii=False)
 
 df_inn = df_inn.astype(str)
 df_inn.to_csv("persons_egrul.csv", index=False)
