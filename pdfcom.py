@@ -26,7 +26,7 @@ def get_n_key(l, n, p):
     if p:
         P = f"{p[0]}."
 
-    return f"{N}{P}{l}"
+    return f"{N}{P}{l}".lower()
 
 
 def getse(df, a, b):
@@ -49,11 +49,15 @@ def get_pers_inf(DF):
     head_data_str = "Сведения о лице, имеющем право без доверенности действовать от имени юридического лица" 
     person_date_str = "ГРН и дата внесения в ЕГРЮЛ сведений о данном лице"
     position_str = "Должность"
-    grbg = ["ГРН и дата внесения в ЕГРЮЛ записи, содержащей указанные сведения"]
+    grbg = [
+    "ГРН и дата внесения в ЕГРЮЛ записи, содержащей указанные сведения", 
+    "ГРН и дата внесения в ЕГРЮЛ записи об исправлении технической ошибки в указанных сведениях"
+    ]
 
     if head_data_str in DF[0].values:
         a = DF.set_index(0).loc[head_data_str, "f"]
         pers_info = DF.set_index("f")[a:a+1].set_index(1, drop=False).dropna()
+        pers_info[0] = pers_info[0].astype(float)
         Counter(pers_info.index)
         d = Counter(pers_info.index)
         
@@ -93,8 +97,22 @@ def get_pers_inf(DF):
 
 def flag(x):
 
-    if re.search(r"^[А-ЯЁа-яё\s\(\),]+$", str(x)):
+    if re.search(r"^[А-ЯЁа-яё\s\(\),\.]+$", str(x)):
         return next(n)
+
+
+def get_block(DF, sss):
+
+    if sss in DF[0].values:
+
+        m = DF.set_index(0).loc[sss, "f"]
+        main_info = DF.set_index("f")[m:m+1].set_index(1, drop=True).dropna()
+        main_info_j = main_info.loc[main_info.index.drop_duplicates(keep=False)][2].to_json(force_ascii=False)
+        main_info_j = json.loads(main_info_j)
+
+        return main_info_j
+    return {}
+
 
 def get_info(pdfpath, k):
 
@@ -108,24 +126,17 @@ def get_info(pdfpath, k):
         multiple_tables=True
     )
 
-    DF = df[1].append([df[2], df[3]])
+    DF = df[1].append([df[2], df[3], df[4]])
     DF.reset_index(drop=True, inplace=True)
     DF = DF.replace({r'\r|\n': ' '}, regex=True)#.set_index(0)
 
     DF["f"] = DF[0].apply(flag)
-
-    m = DF.set_index(0).loc["Наименование", "f"]
-    rg = DF.set_index(0).loc["Сведения об учете в налоговом органе", "f"]
-    main_info = DF.set_index("f")[m:rg+1].set_index(1, drop=True).dropna()
-
-    main_info_j = main_info.loc[main_info.index.drop_duplicates(keep=False)][2].to_json(force_ascii=False)
-    main_info_j = json.loads(main_info_j)
     
     info = {
         "id":k,
-        "ogrn" : main_info_j.get("ИНН", ""),
-        "inn"  : main_info_j.get("ОГРН", ""),
-        "full_name_egrul" : main_info_j.get("Полное наименование", ""),
+        "ogrn" : get_block(DF, "Сведения о регистрации").get("ОГРН", ""),
+        "inn"  : get_block(DF, "Сведения об учете в налоговом органе").get("ИНН", ""),
+        "full_name_egrul" : get_block(DF, "Наименование").get("Полное наименование", ""),
         "pers" : get_pers_inf(DF)
     }
 

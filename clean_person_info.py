@@ -1,11 +1,13 @@
 import pandas as pd
 import sqlalchemy
 import json
+import argparse
+from pdfcom import get_n_key
 
 
 argparser = argparse.ArgumentParser(description='Поиск персон из выписок ЕГРЮЛ в базе')
 requiredNamed = argparser.add_argument_group('required arguments')
-requiredNamed.add_argument('--persons_egul', type=str, help="таблица с данными о персонах из ЕГРЮЛ", required=True)
+requiredNamed.add_argument('--persons_egrul', type=str, help="таблица с данными о персонах из ЕГРЮЛ", required=True)
 
 args = argparser.parse_args()
 
@@ -26,8 +28,8 @@ df["name_key"] = df.apply(lambda x: get_n_key(
 df = df.astype(str).drop_duplicates()
 df = df.astype(str).drop_duplicates(["legal_entity_id", "name_key"])
 
-pers_inn = pd.read_csv(args.persons_egul)
-pers_inn = pd.merge(df_inn, df, how="inner", on=["legal_entity_id", "name_key"])#.drop_duplicates()
+pers_inn = pd.read_csv(args.persons_egrul, dtype=str)
+pers_inn = pd.merge(pers_inn, df, how="inner", on=["legal_entity_id", "name_key"])#.drop_duplicates()
 
 pers_inn.date = pd.to_datetime(pers_inn.date, format="%d.%m.%Y")
 
@@ -40,5 +42,5 @@ for i, g in pers_inn.groupby("legal_entity_id"):
             
 pers_inn.drop(columns=["name_key"], inplace=True)
 
-pers_inn = pers_inn.astype(str)
-pers_inn.to_csv("persons_egul_done.csv", index=False)
+pers_inn = pers_inn.astype(str).replace("NaT", "")
+pers_inn.to_csv("persons_egrul_clean_done.csv", index=False)

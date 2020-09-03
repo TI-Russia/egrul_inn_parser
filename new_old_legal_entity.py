@@ -33,7 +33,7 @@ def get_relivant(s):
         
         RES = re.sub("\s+", r" ", RES)
             
-        return RES
+        return RES.strip()
 
 
 params = json.loads(open("params.json").read())

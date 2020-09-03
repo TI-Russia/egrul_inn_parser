@@ -60,7 +60,7 @@ df_inn = pd.DataFrame(inn_pers, columns=[
     "name_egrul", 
     "patronymic_egrul", 
     "inn",
-    "date"])
+    "date"], dtype=str)
 
 with open("err.json", "w") as f:
     json.dump(Err, f, ensure_ascii=False)
@@ -68,5 +68,5 @@ with open("err.json", "w") as f:
 df_inn = df_inn.astype(str)
 df_inn.to_csv("persons_egrul.csv", index=False)
 
-legal_entities = pd.DataFrame(h).drop(columns=["pers"])
+legal_entities = pd.DataFrame(h, dtype=str).drop(columns=["pers"])
 legal_entities.to_csv("legal_entities.csv", index=False)
